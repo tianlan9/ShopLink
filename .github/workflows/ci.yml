@@ -33,6 +33,16 @@ jobs:
         target: 'desktop'
         arch: 'gcc_64'
         modules: 'qtbase'     # qtbase 包含 Core, Gui, Widgets, Sql, Network 等基础模块
+        install-prefix: '/home/runner/work/ShopLink/Qt'
+
+    - name: Check Qt Available Packages
+      run: |
+        echo "Checking available Qt packages for version 6.5.0..."
+        /home/runner/work/ShopLink/Qt/bin/aqt list-qt linux desktop --modules qtbase
+        # 如果上面的命令失败，或者输出不正确，尝试移除 --modules
+        # /home/runner/work/ShopLink/Qt/bin/aqt list-qt linux desktop
+        echo "Checking available Qt packages for version 6.5.0 (default arch)..."
+        /home/runner/work/ShopLink/Qt/bin/aqt list-qt linux desktop --modules qtbase
 
     # 4. 配置 CMake
     # -B build: 生成构建文件到 build 目录
