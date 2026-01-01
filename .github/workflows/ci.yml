@@ -1,0 +1,54 @@
+name: C++ Qt ShopLink CI
+
+# 触发机制：当 main 分支有 Push 或 Pull Request 时触发
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    # 使用最新的 Ubuntu 镜像
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. 检出代码
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # 2. 安装构建工具 (编译器, CMake, Ninja)
+    - name: Install Build Tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake ninja-build libgl1-mesa-dev
+
+    # 3. 安装 Qt6 环境
+    # 使用这个 Action 可以方便地在 CI 环境中配置 Qt
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.5.0'      # 指定 Qt 版本，建议与本地接近
+        host: 'linux'
+        target: 'desktop'
+        arch: 'gcc_64'
+        modules: 'qtbase'     # qtbase 包含 Core, Gui, Widgets, Sql, Network 等基础模块
+
+    # 4. 配置 CMake
+    # -B build: 生成构建文件到 build 目录
+    # -G Ninja: 使用 Ninja 构建系统（比 Make 更快）
+    # -DCMAKE_BUILD_TYPE=Debug: 构建 Debug 版本
+    - name: Configure CMake
+      run: cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Debug
+
+    # 5. 编译项目 (只编译测试程序，节省时间)
+    # 如果你也想编译主程序，可以把 --target UnitTests 去掉
+    - name: Build UnitTests
+      run: cmake --build build --target UnitTests
+
+    # 6. 运行单元测试
+    # 使用 CTest (CMake 自带的测试运行器)
+    # --output-on-failure: 如果测试失败，输出详细日志
+    - name: Run Tests
+      working-directory: build
+      run: ctest --output-on-failure
