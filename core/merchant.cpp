@@ -3,19 +3,8 @@
 
 // 发布产品
 void Merchant::publishProduct(QSqlDatabase &db, const Product &product) {
-    QSqlQuery query(db);
-    query.prepare("INSERT INTO Products (name, description, price, image) "
-                  "VALUES (:name, :description, :price, :image)");
-    query.bindValue(":name", product.getName());
-    query.bindValue(":description", product.getDescription());
-    query.bindValue(":price", product.getPrice());
-    query.bindValue(":image", product.getImage());
-
-    if (!query.exec()) {
-        qDebug() << "Error publishing product:" << query.lastError().text();
-    } else {
-        qDebug() << "Product published successfully!";
-    }
+    // Reuse Product insertion logic which validates and truncates descriptions as needed
+    product.insertProductToDB(db);
 }
 
 // 移除产品

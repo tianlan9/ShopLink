@@ -36,12 +36,16 @@ public:
     void setImage(const QString &productImage) { image = productImage; }
 
     // 商品的数据库操作
-    void insertProductToDB(QSqlDatabase &db);
+    void insertProductToDB(QSqlDatabase &db) const;
     static Product getProductFromDB(QSqlDatabase &db, int productId);
     static void deleteProductFromDB(QSqlDatabase &db, int productId);
 
     // 显示商品信息
     void displayProduct() const;
 };
+
+// Safer parser variant: parses and outputs the payload (without prefix).
+// Returns true on success; in case of truncation sets error message but still returns true.
+bool parseProductDescriptionToQString(const char* input, QString &out, QString &errorMsg, int maxLen = 1024);
 
 #endif // PRODUCT_H

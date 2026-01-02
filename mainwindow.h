@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QSqlDatabase>
+#include <memory>
 #include "core/user.h"
 #include "core/customer.h"
 #include "core/merchant.h"
@@ -28,7 +29,7 @@ private slots:
 private:
     Ui::MainWindow *ui;  // GUI 组件
     QSqlDatabase db;     // 数据库连接
-    User *currentUser;    // 当前登录的用户
+    std::unique_ptr<User> currentUser;    // 当前登录的用户
     void loadProducts();
 };
 

@@ -4,6 +4,7 @@
 #include <QSqlError>
 #include <QDebug>
 #include <QCoreApplication>
+#include <string>
 
 // 引入被测头文件
 #include "core/customer.h"
@@ -39,6 +40,7 @@ protected:
                    "userId INTEGER PRIMARY KEY AUTOINCREMENT, "
                    "username TEXT NOT NULL, "
                    "password TEXT NOT NULL, "
+                   "salt TEXT NOT NULL, "
                    "email TEXT NOT NULL, "
                    "role TEXT NOT NULL)");
 
@@ -149,6 +151,43 @@ TEST_F(ShopLinkTest, GetProductFromDBNotFound) {
 
     // 根据你的代码逻辑，没找到时返回 ID 为 -1
     EXPECT_EQ(p.getProductId(), -1);
+}
+
+// Ensure parseProductDescription handles overly long inputs without crashing
+TEST_F(ShopLinkTest, ParseProductDescriptionHandlesLongInput) {
+    std::string longdesc(5000, 'A');
+    std::string input = std::string("DESC:") + longdesc;
+    QString out;
+    QString err;
+    bool ok = parseProductDescriptionToQString(input.c_str(), out, err, 1024);
+    EXPECT_TRUE(ok);
+    EXPECT_FALSE(err.isEmpty()); // truncation message expected
+    EXPECT_LE(out.size(), 1024);
+}
+
+TEST_F(ShopLinkTest, InsertProductWithDescPrefixStoresParsedDescription) {
+    Product p(0, "Gadget", "DESC:This is a special gadget", 12.5, "g.png");
+    p.insertProductToDB(db);
+
+    QSqlQuery q(db);
+    q.exec("SELECT description FROM Products WHERE name='Gadget'");
+    ASSERT_TRUE(q.next());
+    EXPECT_EQ(q.value("description").toString(), "This is a special gadget");
+}
+
+TEST_F(ShopLinkTest, PublishProductWithTruncatedDescription) {
+    std::string longdesc(5000, 'B');
+    std::string input = std::string("DESC:") + longdesc;
+    Product p(0, "Huge", QString::fromStdString(input), 1.0, "h.png");
+    Merchant m(0, "seller", "pass", "s@s.com");
+
+    m.publishProduct(db, p);
+
+    QSqlQuery q(db);
+    q.exec("SELECT description FROM Products WHERE name='Huge'");
+    ASSERT_TRUE(q.next());
+    QString stored = q.value("description").toString();
+    EXPECT_LE(stored.size(), 1024);
 }
 
 // 测试用例 9: 商家发布产品 (集成测试)

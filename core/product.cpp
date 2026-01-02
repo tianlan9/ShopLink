@@ -1,13 +1,54 @@
 #include "product.h"
 #include <QDebug>
+#include <cstring>
+
 
 // 插入商品到数据库
-void Product::insertProductToDB(QSqlDatabase &db) {
+bool parseProductDescriptionToQString(const char* input, QString &out, QString &errorMsg, int maxLen) {
+    if (!input) {
+        errorMsg = "Invalid input (null).";
+        return false;
+    }
+    const char prefix[] = "DESC:";
+    if (std::strncmp(input, prefix, 5) != 0) {
+        errorMsg = "Invalid format.";
+        return false;
+    }
+    const char* payload = input + 5;
+    int payload_len = static_cast<int>(std::strlen(payload));
+    if (payload_len == 0) {
+        errorMsg = "Empty product description.";
+        return false;
+    }
+    if (payload_len > maxLen) {
+        errorMsg = QString("Product description too long (max %1). Truncating.").arg(maxLen);
+        out = QString::fromUtf8(payload, maxLen);
+        return true;
+    }
+    out = QString::fromUtf8(payload);
+    return true;
+}
+
+void Product::insertProductToDB(QSqlDatabase &db) const {
+    QString descToStore = description;
+    QString err;
+    if (description.startsWith("DESC:")) {
+        bool ok = parseProductDescriptionToQString(description.toUtf8().constData(), descToStore, err);
+        if (!ok) {
+            qDebug() << "Product description invalid:" << err;
+            // Decide: reject insertion or store empty description. Here we reject insertion to prevent bad data.
+            return;
+        }
+        if (!err.isEmpty()) {
+            qDebug() << err;
+        }
+    }
+
     QSqlQuery query(db);
     query.prepare("INSERT INTO Products (name, description, price, image) "
                   "VALUES (:name, :description, :price, :image)");
     query.bindValue(":name", name);
-    query.bindValue(":description", description);
+    query.bindValue(":description", descToStore);
     query.bindValue(":price", price);
     query.bindValue(":image", image);
 

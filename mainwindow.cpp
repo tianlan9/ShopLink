@@ -29,6 +29,25 @@ void createTables(QSqlDatabase &db) {
         qDebug() << "Users table created successfully.";
     }
 
+    // Ensure backward compatibility: add `salt` column if it doesn't exist (for older DBs)
+    bool hasSalt = false;
+    query.exec("PRAGMA table_info(Users)");
+    while (query.next()) {
+        QString colName = query.value(1).toString(); // column name is at index 1
+        if (colName == "salt") {
+            hasSalt = true;
+            break;
+        }
+    }
+    if (!hasSalt) {
+        qDebug() << "Adding missing 'salt' column to Users table.";
+        if (!query.exec("ALTER TABLE Users ADD COLUMN salt TEXT")) {
+            qDebug() << "Error adding salt column:" << query.lastError().text();
+        } else {
+            qDebug() << "Added 'salt' column to Users table.";
+        }
+    }
+
     // 创建 Products 表
     query.exec("CREATE TABLE IF NOT EXISTS Products ("
                "productId INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -111,12 +130,15 @@ void MainWindow::on_loginButton_clicked()
     QString password = ui->passwordLineEdit->text();  // 获取密码
     QString role = ui->roleLineEdit_4->text();
     if(role == "customer"){
-        currentUser = new Customer(0, username, password, "");
+        currentUser.reset(new Customer(0, username, password, ""));
     }
     else if(role == "merchant"){
-        currentUser = new Merchant(0, username, password, "");
+        currentUser.reset(new Merchant(0, username, password, ""));
+    } else {
+        QMessageBox::warning(this, "Login Failed", "Role must be 'customer' or 'merchant'.");
+        return;
     }
-    if (currentUser->login(db, password)) {
+    if (currentUser && currentUser->login(db, password)) {
         QMessageBox::information(this, "Login Successful", "Welcome, " + username);
         if(role == "customer"){
             ui->stackedWidget->setCurrentIndex(1);
@@ -136,15 +158,18 @@ void MainWindow::on_registerButton_clicked()
     QString email = ui->emailLineEdit_3->text();
     QString role = ui->roleLineEdit_3->text();
     if(role == "customer"){
-        currentUser = new Customer(0, username, password, email);
+        currentUser.reset(new Customer(0, username, password, email));
     }
     else if(role == "merchant"){
-        currentUser = new Merchant(0, username, password, email);
+        currentUser.reset(new Merchant(0, username, password, email));
+    } else {
+        QMessageBox::warning(this, "Registration Failed", "Role must be 'customer' or 'merchant'.");
+        return;
     }
 
 
     // 调用 User::registerUser() 进行注册
-    currentUser->registerUser(db);
+    if (currentUser) currentUser->registerUser(db);
 
     QMessageBox::information(this, "Registration", "User registered successfully!");
 }
@@ -157,6 +182,14 @@ void MainWindow::on_publishButton_clicked()
     QString image = ui->imageLineEdit->text();
 
     Product product(0, name, description, price, image);
-    Merchant *merchant = static_cast<Merchant *>(currentUser);
+    if (!currentUser) {
+        QMessageBox::warning(this, "Error", "No user logged in.");
+        return;
+    }
+    Merchant *merchant = dynamic_cast<Merchant *>(currentUser.get());
+    if (!merchant) {
+        QMessageBox::warning(this, "Error", "Only merchants can publish products.");
+        return;
+    }
     merchant->publishProduct(db, product);
 }
